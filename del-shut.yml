@@ -1,0 +1,65 @@
+---
+- name: Delete Endpoint and Shut Interface
+  hosts: all
+  connection: local
+  gather_facts: no
+  vars_files:
+  - auth.yml
+ 
+  tasks:
+
+  - name: configure provider
+    set_fact:
+      provider: 
+        username: "{{ username }}"
+        password: "{{ password }}"
+        host: "{{ inventory_hostname }}"
+
+  - name: shut interfaces
+    ios_interface:
+      provider: "{{ provider }}"
+      name: "{{ item }}"
+      enabled: False
+    loop:
+      - GigabitEthernet0/4
+    when: "'ios' in group_names"
+
+  - name: Get Endpoint ID
+    uri: 
+      url: https://172.28.77.25:9060/ers/config/endpoint/name/FC-FB-FB-CA-22-A5
+      method: GET
+      user: admin
+      password: G0lfc0urs3
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 200
+      headers:
+        ERS-Media-Type: "identity.endpoint.1.2"
+        ACCEPT: "application/json"
+      when: "'ise' in group_names"
+    register: result
+
+  - debug: 
+      var: result.json.ERSEndPoint.id
+
+  - set_fact:
+      endpoint_id: "{{ result.json.ERSEndPoint.id }}"
+
+  - debug:
+      var: endpoint_id
+
+
+  - name: Delete Endpoint by ID
+    uri:
+      url: https://172.28.77.25:9060/ers/config/endpoint/{{ endpoint_id }}
+      method: DELETE
+      user: admin
+      password: G0lfc0urs3
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 204
+      headers:
+        ERS-Media-Type: "identity.endpoint.1.2"
+        ACCEPT: "application/json"
+    when: "'ise' in group_names"
+
