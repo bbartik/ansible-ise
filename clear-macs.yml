@@ -1,0 +1,80 @@
+---
+- name: Delete Endpoint and Shut Interface
+  hosts: all
+  connection: local
+  gather_facts: no
+  vars:
+  - skip: no
+  vars_files:
+  - auth.yml
+  - endpoints.yml
+  vars_prompt:
+  - name: "enable_port"
+    prompt: "Do you want to re-enable the port after we clear endpoint? [y/n]"
+    private: no
+ 
+  tasks:
+
+  - name: configure provider
+    set_fact:
+      provider: 
+        username: "{{ username }}"
+        password: "{{ password }}"
+        host: "{{ inventory_hostname }}"
+
+  - name: shut interfaces
+    ios_interface:
+      provider: "{{ provider }}"
+      name: "{{ item }}"
+      enabled: False
+    loop:
+      - GigabitEthernet0/4
+    when: "'ios' in group_names"
+
+  - name: Get Endpoint ID
+    uri: 
+      url: https://172.28.77.25:9060/ers/config/endpoint/name/{{ item.mac }}
+      method: GET
+      user: admin
+      password: G0lfc0urs3
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 200
+      headers:
+        ERS-Media-Type: "identity.endpoint.1.2"
+        ACCEPT: "application/json"
+    when: "'ise' in group_names"
+    register: result
+    ignore_errors: yes
+    with_items: "{{ endpoints }}"
+
+  - debug:
+      var: item.json.ERSEndPoint.id
+    with_items: "{{ result.results }}"
+   
+  - name: Delete Endpoint by ID
+    uri:
+      url: https://172.28.77.25:9060/ers/config/endpoint/{{ item.json.ERSEndPoint.id }}
+      method: DELETE
+      user: admin
+      password: G0lfc0urs3
+      force_basic_auth: yes
+      validate_certs: no
+      status_code: 204
+      headers:
+        ERS-Media-Type: "identity.endpoint.1.2"
+        ACCEPT: "application/json"
+    when: "'ise' in group_names"
+    ignore_errors: yes
+    with_items: "{{ result.results }}"
+
+  - name: Re-enable interface
+    ios_interface:
+      provider: "{{ provider }}"
+      name: "{{ item }}"
+      enabled: True
+    loop:
+      - GigabitEthernet0/4
+    when: enable_port == "y" and 'ios' in group_names
+
+
