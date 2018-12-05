@@ -8,6 +8,6 @@ Variety of small Ansible and ISE playbooks
 * The interface is set in the playbook.
 * The playbook also prompts to enable the interface after clearing.
 
-'''
+```
 ansible-playbook clear-macs.yml
-'''
+```
